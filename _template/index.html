@@ -1,4 +1,5 @@
 <!doctype html>
+<!-- Built with Claude Code (https://claude.com/claude-code) and reviewed by the lab. -->
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -40,6 +41,7 @@
           to Read and write, and Issues to Read-only. Copy the <code>github_pat_…</code> value here.</p>
       </div>
       <p class="err" id="signin-error" hidden></p>
+      <p class="muted">Built with <a href="https://claude.com/claude-code">Claude Code</a> and reviewed by the lab.</p>
     </div>
     <div id="app"></div>
 
@@ -203,6 +205,12 @@
             ].join('');
             article.prepend(bar);
             bar.querySelector('#signout').onclick = signOut;
+            if (!article.querySelector('.site-credit')) {
+              const c = document.createElement('p'); c.className = 'site-credit';
+              c.style.cssText = 'font-size:12px;color:#888;margin-top:3rem';
+              c.innerHTML = 'Site built with <a href="https://claude.com/claude-code" style="color:inherit">Claude Code</a> and reviewed by the lab.';
+              article.append(c);
+            }
             const prefix = `${REPO_URL}/blob/${BRANCH}/`;
             article.querySelectorAll(`a[href^="${prefix}"]`).forEach((a) => {
               const rest = a.getAttribute('href').slice(prefix.length);

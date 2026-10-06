@@ -67,3 +67,7 @@ The reader requires a GitHub login, so Claude cannot fetch it. That is by design
 the documentation database. Connect `uasal/lab_documents` to Claude through the GitHub connector
 (Claude.ai Projects or a Team/Enterprise connector) or clone it for Claude Code; its `CLAUDE.md`
 describes the layout. The reader and editor are the human-facing views of the same files.
+
+---
+
+*Drafted with [Claude Code](https://claude.com/claude-code) and reviewed by the lab. Edit freely; the git history records who changed what.*
