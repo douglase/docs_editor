@@ -1,0 +1,167 @@
+# Sveltia CMS configuration for the UASAL lab_documents repository.
+#
+# This repo is only the editor: index.html, this file and a pinned copy of Sveltia under
+# vendor/. It is published on GitHub Pages (HTTPS) because browsers refuse to run the editor
+# on plain-HTTP hosts, and the docs site itself lives on an internal server. The editor talks
+# to GitHub directly from the signed-in person's browser, so no document content ever passes
+# through this site: anyone without access to the target repo sees an authorization error.
+#
+# Keep the collections here in step with the folders of uasal/lab_documents.
+# Docs: https://sveltiacms.app/en/docs  (drop-in compatible with Decap CMS configs)
+
+backend:
+  name: github
+  repo: uasal/lab_documents          # change to your fork for testing, e.g. douglase/lab_documents
+  branch: main
+  # OAuth sign-in needs a small relay because GitHub does not support PKCE for
+  # browser apps. Deploy https://github.com/sveltia/sveltia-cms-auth (a free
+  # Cloudflare Worker) with a GitHub OAuth App, then uncomment:
+  # base_url: https://sveltia-cms-auth.<your-account>.workers.dev
+  #
+  # Until then, "Sign in with a personal access token" works with a
+  # fine-grained token that has Contents: read/write, Pull requests: read/write
+  # and Issues: read (the last one is needed by the editorial workflow labels).
+  auth_methods: [oauth, token]
+  squash_merges: true                # editorial-workflow PRs merge as one commit
+  cms_label_prefix: sveltia-cms/     # PR labels: draft / pending_review / pending_publish
+  # The workflow board's "View Preview" button opens whatever commit status matches this
+  # context. .github/workflows/sveltia-pr-link.yml posts a status named `pr-link` whose
+  # target is the pull request itself, so each card links to its PR. When the docs site
+  # gets real per-branch previews, point that same status at the preview URL instead.
+  preview_context: pr-link
+
+# Default: saves go straight to `main` (same as the GitHub "Commit directly" button).
+# Individual collections below switch to editorial_workflow, which creates a PR instead.
+publish_mode: simple
+
+# Where drag-and-dropped images land. Absolute (repo-root) paths work both on
+# GitHub and in Sphinx/MyST, which treats a leading slash as source-root relative.
+media_folder: computing/assets
+public_folder: /computing/assets
+
+# The top-bar "view site" link: the rendered docs (internal address, reachable on campus/VPN).
+# The review queue on GitHub is: https://github.com/uasal/lab_documents/pulls?q=is%3Apr+is%3Aopen+label%3Asveltia-cms%2Fpending_review
+site_url: http://10.130.30.8/stp_org_struct/lab_documents/
+display_url: http://10.130.30.8/stp_org_struct/lab_documents/
+
+# All pages use one field: the whole Markdown file is the body. `format: raw`
+# makes Sveltia write the body back verbatim, with no YAML front matter, so the
+# files stay plain Markdown for GitHub, Sphinx and Claude. The editor opens in
+# rich-text (WYSIWYG) mode; the "raw" tab shows Markdown for people who prefer it.
+
+collections:
+  # ---------------------------------------------------------------- lab-wide pages
+  - name: lab
+    label: Lab-wide pages
+    icon: home
+    description: Onboarding, contacts, lists and general lab information. Saves commit directly to main.
+    format: raw
+    editor: { preview: true }
+    files:
+      - name: new_team_member
+        label: New team member guide
+        file: new_team_member.md
+        fields: &body_only
+          - name: body
+            label: Page content
+            widget: markdown
+            modes: [rich_text, raw]
+            hint: Headings, lists, links, tables and images are supported. Switch to the raw tab for Markdown.
+      - { name: email_lists,      label: Email lists,              file: email_lists.md,               fields: *body_only }
+      - { name: vendor_directory, label: Vendor directory,         file: vendor_directory.md,          fields: *body_only }
+      - { name: default_tools,    label: Default tools,            file: default_tools.md,             fields: *body_only }
+      - { name: problem_solving,  label: Problem solving,          file: problem_solving.md,           fields: *body_only }
+      - { name: interview_questions, label: Interview questions,   file: interview_questions.md,       fields: *body_only }
+      - { name: lab_stats,        label: Lab room stats,           file: lab_stats.md,                 fields: *body_only }
+      - { name: room_availability, label: Steward room availability, file: Steward_Room_avalailability.md, fields: *body_only }
+
+  # ---------------------------------------------------------------- protected policies
+  - name: policies
+    label: Policies (review required)
+    icon: gavel
+    description: Changes here open a pull request for a maintainer to review instead of saving directly.
+    format: raw
+    publish_mode: editorial_workflow   # every save becomes a draft PR on cms/policies/<name>
+    publish: false                     # editors can move a PR to "In review" but not merge it
+    editor: { preview: true }
+    files:
+      - { name: conduct,             label: Code of conduct,      file: conduct.md,             fields: *body_only }
+      - { name: conference_policies, label: Conference policy,    file: conference_policies.md, fields: *body_only }
+      - { name: publication_guide,   label: Publication guide,    file: publication_guide.md,   fields: *body_only }
+      - { name: procurement,         label: Procurement,          file: procurement.md,         fields: *body_only }
+
+  - name: safety
+    label: Safety (review required)
+    icon: health_and_safety
+    description: SOPs and checklists. Changes open a pull request for review.
+    folder: safety
+    format: raw
+    extension: md
+    slug:                              # new pages: the editor asks for a file name (no title field exists in raw files)
+      template: new-page
+      editable: true
+      hint: File name for the new page, lowercase with underscores, e.g. workstation_picasso
+    publish_mode: editorial_workflow
+    publish: false
+    create: true
+    delete: false
+    summary: "{{body | truncate(60)}}"   # entry label: first line of the page (usually its title)
+    media_folder: /safety
+    public_folder: /safety
+    editor: { preview: true }
+    fields: *body_only
+
+  # ---------------------------------------------------------------- everything else: direct save
+  - name: computing
+    label: Computing
+    icon: computer
+    description: Workstations, storage, HPC, VPN and software guides. Saves commit directly to main.
+    folder: computing
+    format: raw
+    extension: md
+    slug:                              # new pages: the editor asks for a file name (no title field exists in raw files)
+      template: new-page
+      editable: true
+      hint: File name for the new page, lowercase with underscores, e.g. workstation_picasso
+    create: true
+    delete: false
+    summary: "{{body | truncate(60)}}"
+    sortable_fields: [commit_date, commit_author]
+    media_folder: /computing/assets
+    public_folder: /computing/assets
+    editor: { preview: true }
+    fields: *body_only
+
+  - name: arb
+    label: ARB building
+    icon: apartment
+    folder: ARB
+    format: raw
+    extension: md
+    slug:                              # new pages: the editor asks for a file name (no title field exists in raw files)
+      template: new-page
+      editable: true
+      hint: File name for the new page, lowercase with underscores, e.g. workstation_picasso
+    delete: false
+    summary: "{{body | truncate(60)}}"
+    media_folder: /ARB
+    public_folder: /ARB
+    fields: *body_only
+
+  - name: reports
+    label: Reports
+    icon: description
+    description: One folder per report, with its figures alongside.
+    folder: reports
+    format: raw
+    extension: md
+    slug:                              # new pages: the editor asks for a file name (no title field exists in raw files)
+      template: new-page
+      editable: true
+      hint: File name for the new page, lowercase with underscores, e.g. workstation_picasso
+    nested: { depth: 2 }               # shows reports/<name>/report.md as a tree
+    delete: false
+    summary: "{{body | truncate(60)}}"
+    media_folder: ""                   # figures live next to each report.md
+    public_folder: ""
+    fields: *body_only
