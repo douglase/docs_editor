@@ -1,4 +1,4 @@
-# Sveltia CMS configuration for the UASAL lab_documents repository.
+# Sveltia CMS configuration for the lab_documents repository.
 #
 # This repo is only the editor: index.html, this file and a pinned copy of Sveltia under
 # vendor/. It is published on GitHub Pages (HTTPS) because browsers refuse to run the editor
@@ -73,7 +73,7 @@ collections:
       - { name: problem_solving,  label: Problem solving,          file: problem_solving.md,           fields: *body_only }
       - { name: interview_questions, label: Interview questions,   file: interview_questions.md,       fields: *body_only }
       - { name: lab_stats,        label: Lab room stats,           file: lab_stats.md,                 fields: *body_only }
-      - { name: room_availability, label: Steward room availability, file: Steward_Room_avalailability.md, fields: *body_only }
+      - { name: room_availability, label: Room availability, file: Steward_Room_avalailability.md, fields: *body_only }
 
   # ---------------------------------------------------------------- protected policies
   - name: policies
@@ -115,7 +115,7 @@ collections:
   - name: computing
     label: Computing
     icon: computer
-    description: Workstations, storage, HPC, VPN and software guides. Saves commit directly to main.
+    description: Workstations, storage, HPC, remote access and software guides. Saves commit directly to main.
     folder: computing
     format: raw
     extension: md
