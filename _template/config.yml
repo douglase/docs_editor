@@ -1,0 +1,61 @@
+# Sveltia CMS config template. Copy this folder to <repo_name>/, then:
+#   1. set backend.repo and branch
+#   2. describe the folders/files editors may touch as collections
+#   3. add the folder to the list in ../index.html
+# Reference: https://sveltiacms.app/en/docs/config-basics
+# Validate against the JSON schema in the @sveltia/cms npm package (schema/sveltia-cms.json).
+
+backend:
+  name: github
+  repo: OWNER/REPO                   # the repository this editor edits
+  branch: main
+  # base_url: https://sveltia-cms-auth.<account>.workers.dev   # OAuth relay for the "Sign in with GitHub" button
+  auth_methods: [oauth, token]       # token sign-in works with no relay
+  squash_merges: true
+  cms_label_prefix: sveltia-cms/
+  preview_context: pr-link           # see lab_documents/config.yml for the matching GitHub Action
+
+publish_mode: simple                 # or editorial_workflow (every save becomes a draft PR)
+
+media_folder: assets                 # where uploaded images are committed
+public_folder: /assets               # how pages reference them (repo-root absolute)
+
+# site_url: https://...             # "view site" link in the top bar
+display_url: https://github.com/OWNER/REPO
+
+collections:
+  # Plain Markdown files, written back verbatim (no front matter added). One collection per folder.
+  - name: docs
+    label: Docs
+    icon: description
+    folder: docs                     # folder in the target repo
+    format: raw
+    extension: md
+    create: true
+    delete: false
+    summary: "{{body | truncate(60)}}"
+    slug: { template: new-page, editable: true, hint: "File name, lowercase with underscores" }
+    editor: { preview: true }
+    fields:
+      - { name: body, label: Page content, widget: markdown, modes: [rich_text, raw] }
+
+  # Files with YAML front matter (typical for Hugo/Jekyll/MkDocs sites): declare the fields.
+  # - name: posts
+  #   label: Posts
+  #   folder: content/posts
+  #   format: frontmatter
+  #   extension: md
+  #   fields:
+  #     - { name: title, label: Title, widget: string }
+  #     - { name: date, label: Date, widget: datetime }
+  #     - { name: body, label: Body, widget: markdown }
+
+  # A fixed set of top-level files, with review required before merge:
+  # - name: policies
+  #   label: Policies (review required)
+  #   format: raw
+  #   publish_mode: editorial_workflow
+  #   publish: false
+  #   files:
+  #     - { name: conduct, label: Code of conduct, file: CONDUCT.md,
+  #         fields: [{ name: body, label: Page content, widget: markdown }] }

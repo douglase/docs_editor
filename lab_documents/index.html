@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>UASAL lab documents editor</title>
+    <!-- Tell Sveltia where the config is and what type it is, independent of the server's MIME table -->
+    <link rel="cms-config-url" type="application/yaml" href="config.yml" />
+    <style>
+      #fallback { font: 15px/1.5 system-ui, sans-serif; max-width: 48rem; margin: 3rem auto; padding: 0 1rem; color: #333; }
+      #fallback pre { white-space: pre-wrap; background: #f6f6f6; padding: 0.75rem; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <!-- Sveltia replaces this once it starts. If it stays visible, the editor script never ran;
+         the error (if any) is printed below so it can be reported without opening Web Inspector. -->
+    <div id="fallback">
+      <p><strong>Loading the editor…</strong></p>
+      <p>If this message does not go away within a few seconds, the editor script did not load or
+        failed to start. The error, if any, is shown below. To read the documents without editing,
+        go <a href="http://10.130.30.8/stp_org_struct/lab_documents/">back to the docs site</a>.</p>
+      <pre id="fallback-error" hidden></pre>
+    </div>
+    <script>
+      (function () {
+        var box = document.getElementById('fallback-error');
+        function show(msg) { box.hidden = false; box.textContent += msg + '\n'; }
+        window.addEventListener('error', function (e) {
+          show((e.message || 'Script error') + (e.filename ? '  [' + e.filename.split('/').pop() + ':' + e.lineno + ']' : ''));
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+          show('Unhandled promise rejection: ' + (e.reason && (e.reason.message || e.reason)));
+        });
+        window.__sveltiaScriptFailed = function () { show('The editor script (../vendor/) could not be loaded from this server.'); };
+        // Sveltia mounts its own UI next to this block rather than replacing it: hide the
+        // fallback as soon as any other element is added to <body>.
+        new MutationObserver(function (muts, obs) {
+          for (var m of muts) for (var n of m.addedNodes) {
+            if (n.nodeType === 1 && n.id !== 'fallback' && n.tagName !== 'SCRIPT') {
+              document.getElementById('fallback').hidden = true; obs.disconnect(); return;
+            }
+          }
+        }).observe(document.body, { childList: true });
+      })();
+    </script>
+    <!-- Sveltia CMS: a static, browser-only editor for the Markdown files in uasal/lab_documents.
+         Served from vendor/ (pinned copy). Changelog: https://github.com/sveltia/sveltia-cms/releases -->
+    <script src="../vendor/sveltia-cms@0.226.0/sveltia-cms.js" onerror="__sveltiaScriptFailed()"></script>
+  </body>
+</html>
