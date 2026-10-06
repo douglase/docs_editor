@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>REPO_NAME editor</title>
+    <link rel="cms-config-url" type="application/yaml" href="config.yml" />
+    <style>
+      #fallback { font: 15px/1.5 system-ui, sans-serif; max-width: 48rem; margin: 3rem auto; padding: 0 1rem; color: #333; }
+      #fallback pre { white-space: pre-wrap; background: #f6f6f6; padding: 0.75rem; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <div id="fallback">
+      <p><strong>Loading the editor…</strong></p>
+      <p>If this message does not go away within a few seconds, the editor script did not load or
+        failed to start. The error, if any, is shown below. <a href="../">Back to the docs</a>.</p>
+      <pre id="fallback-error" hidden></pre>
+    </div>
+    <script>
+      (function () {
+        var box = document.getElementById('fallback-error');
+        function show(msg) { box.hidden = false; box.textContent += msg + '\n'; }
+        window.addEventListener('error', function (e) { show((e.message || 'Script error') + (e.filename ? '  [' + e.filename.split('/').pop() + ':' + e.lineno + ']' : '')); });
+        window.addEventListener('unhandledrejection', function (e) { show('Unhandled promise rejection: ' + (e.reason && (e.reason.message || e.reason))); });
+        window.__sveltiaScriptFailed = function () { show('The editor script (../../vendor/) could not be loaded from this server.'); };
+        new MutationObserver(function (muts, obs) {
+          for (var m of muts) for (var n of m.addedNodes) {
+            if (n.nodeType === 1 && n.id !== 'fallback' && n.tagName !== 'SCRIPT') { document.getElementById('fallback').hidden = true; obs.disconnect(); return; }
+          }
+        }).observe(document.body, { childList: true });
+      })();
+    </script>
+    <!-- Shared, pinned copy of Sveltia CMS. Do not copy it per folder. -->
+    <script src="../../vendor/sveltia-cms@0.226.0/sveltia-cms.js" onerror="__sveltiaScriptFailed()"></script>
+  </body>
+</html>

@@ -4,35 +4,230 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
-    <title>REPO_NAME editor</title>
-    <link rel="cms-config-url" type="application/yaml" href="config.yml" />
+    <title>REPO_NAME documents</title>
+    <!-- Reader for a PRIVATE GitHub repository. Docsify renders the Markdown in the browser, but
+         instead of fetching files from this web server it fetches them from the GitHub Contents
+         API with the reader's own GitHub credential, so nothing from the repo is ever stored on
+         this site and only people with access to the repo can read it. Sign-in is shared with the
+         Sveltia editor in ./edit/ (same browser storage key), so one login covers both. -->
+    <link rel="stylesheet" href="../vendor/docsify@5.0.0/themes/core.min.css" />
     <style>
-      #fallback { font: 15px/1.5 system-ui, sans-serif; max-width: 48rem; margin: 3rem auto; padding: 0 1rem; color: #333; }
-      #fallback pre { white-space: pre-wrap; background: #f6f6f6; padding: 0.75rem; border-radius: 4px; }
+      :root { --sidebar-width: 19rem; }
+      .page-tools { display: flex; gap: 1rem; justify-content: flex-end; font-size: 0.85rem; margin: 0 0 1rem; flex-wrap: wrap; }
+      .page-tools a { text-decoration: none; opacity: 0.8; cursor: pointer; }
+      .page-tools a:hover { opacity: 1; text-decoration: underline; }
+      #signin { font: 16px/1.6 system-ui, sans-serif; max-width: 34rem; margin: 4rem auto; padding: 0 1rem; color: #222; }
+      #signin button { font: inherit; padding: 0.5rem 1rem; margin: 0.25rem 0.5rem 0.25rem 0; cursor: pointer; }
+      #signin input { font: inherit; width: 100%; padding: 0.4rem; margin: 0.25rem 0; }
+      #signin .err { color: #b00020; }
+      #signin .muted { color: #666; font-size: 0.9rem; }
     </style>
   </head>
   <body>
-    <div id="fallback">
-      <p><strong>Loading the editor…</strong></p>
-      <p>If this message does not go away within a few seconds, the editor script did not load or
-        failed to start. The error, if any, is shown below. <a href="../">All editors</a>.</p>
-      <pre id="fallback-error" hidden></pre>
+    <div id="signin" hidden>
+      <h1>REPO_NAME documents</h1>
+      <p>These documents live in a private GitHub repository. Sign in with the GitHub account that
+        has access to it; the pages are fetched straight from GitHub into your browser.</p>
+      <p><button id="btn-github">Sign in with GitHub</button>
+         <button id="btn-token">Use a personal access token</button></p>
+      <div id="token-form" hidden>
+        <input id="token-input" type="password" placeholder="github_pat_… (Contents: read is enough to read)" autocomplete="off" />
+        <button id="btn-token-go">Continue</button>
+        <p class="muted">Create one at github.com → Settings → Developer settings → Fine-grained tokens,
+          scoped to the <code>REPO</code> repository. Add Pull requests and Issues permissions if you
+          also want to edit.</p>
+      </div>
+      <p class="err" id="signin-error" hidden></p>
     </div>
+    <div id="app"></div>
+
     <script>
-      (function () {
-        var box = document.getElementById('fallback-error');
-        function show(msg) { box.hidden = false; box.textContent += msg + '\n'; }
-        window.addEventListener('error', function (e) { show((e.message || 'Script error') + (e.filename ? '  [' + e.filename.split('/').pop() + ':' + e.lineno + ']' : '')); });
-        window.addEventListener('unhandledrejection', function (e) { show('Unhandled promise rejection: ' + (e.reason && (e.reason.message || e.reason))); });
-        window.__sveltiaScriptFailed = function () { show('The editor script (../vendor/) could not be loaded from this server.'); };
-        new MutationObserver(function (muts, obs) {
-          for (var m of muts) for (var n of m.addedNodes) {
-            if (n.nodeType === 1 && n.id !== 'fallback' && n.tagName !== 'SCRIPT') { document.getElementById('fallback').hidden = true; obs.disconnect(); return; }
+      // ------------------------------------------------------------------ settings ----------
+      const OWNER = 'OWNER', REPO = 'REPO', BRANCH = 'main';   // the repository to read
+      const API_BASE = `https://api.github.com/repos/${OWNER}/${REPO}/contents/`;   // + path?ref=BRANCH
+      const REPO_URL = `https://github.com/${OWNER}/${REPO}`;
+      const EDITOR_BASE = 'edit/';            // the Sveltia editor next to this page
+      // OAuth relay (sveltia-cms-auth). Leave empty to offer token sign-in only.
+      const OAUTH_BASE_URL = '';
+
+      // ------------------------------------------------------------------ sign-in ----------
+      const SVELTIA_KEY = 'sveltia-cms.user';   // Sveltia stores {backendName, token, ...} here
+      const OWN_KEY = 'docs-viewer.token';
+      function savedToken() {
+        try {
+          const u = JSON.parse(localStorage.getItem(SVELTIA_KEY) || 'null');
+          if (u && u.backendName === 'github' && typeof u.token === 'string') return u.token;
+        } catch {}
+        return localStorage.getItem(OWN_KEY) || '';
+      }
+      function storeToken(token) {
+        localStorage.setItem(OWN_KEY, token);
+        // Let the editor reuse the same login, unless it already has one.
+        if (!localStorage.getItem(SVELTIA_KEY)) localStorage.setItem(SVELTIA_KEY, JSON.stringify({ backendName: 'github', token }));
+      }
+      function signOut() {
+        localStorage.removeItem(OWN_KEY); localStorage.removeItem(SVELTIA_KEY);
+        try { localStorage.removeItem('docsify.search.index'); } catch {}
+        location.hash = ''; location.reload();
+      }
+      const headersFor = (token) => ({ Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.raw+json', 'X-GitHub-Api-Version': '2022-11-28' });
+      async function checkToken(token) {
+        const r = await fetch(`${API_BASE}README.md?ref=${BRANCH}`, { headers: headersFor(token) });
+        if (r.ok) return null;
+        if (r.status === 401) return 'That token is not valid (expired or revoked).';
+        if (r.status === 403 || r.status === 404) return 'Signed in, but this account has no access to the repository.';
+        return `GitHub answered ${r.status}.`;
+      }
+      // Same popup protocol Sveltia/Decap use with sveltia-cms-auth, so one relay serves both.
+      function oauthSignIn() {
+        return new Promise((resolve, reject) => {
+          const origin = new URL(OAUTH_BASE_URL).origin;
+          const popup = window.open(`${OAUTH_BASE_URL}/auth?provider=github&site_id=${location.host}&scope=repo`, 'oauth', 'width=600,height=720');
+          if (!popup) return reject(new Error('Popup blocked'));
+          const onMsg = (e) => {
+            if (e.origin !== origin) return;
+            if (e.data === 'authorizing:github') { e.source.postMessage('authorizing:github', e.origin); return; }
+            const m = /^authorization:github:(success|error):(.+)$/.exec(e.data);
+            if (!m) return;
+            window.removeEventListener('message', onMsg);
+            try { const d = JSON.parse(m[2]); m[1] === 'success' && d.token ? resolve(d.token) : reject(new Error(d.message || d.error || 'Sign-in failed')); }
+            catch { reject(new Error('Unexpected reply from the sign-in relay')); }
+          };
+          window.addEventListener('message', onMsg);
+        });
+      }
+      function showSignIn(msg) {
+        const box = document.getElementById('signin'); box.hidden = false;
+        const err = document.getElementById('signin-error'); err.hidden = !msg; err.textContent = msg || '';
+        document.getElementById('btn-github').hidden = !OAUTH_BASE_URL;
+        document.getElementById('btn-github').onclick = () => oauthSignIn().then(finish).catch(e => showSignIn(e.message));
+        document.getElementById('btn-token').onclick = () => { document.getElementById('token-form').hidden = false; document.getElementById('token-input').focus(); };
+        document.getElementById('btn-token-go').onclick = () => finish(document.getElementById('token-input').value.trim());
+        document.getElementById('token-input').onkeydown = (e) => { if (e.key === 'Enter') finish(e.target.value.trim()); };
+      }
+      async function finish(token) {
+        if (!token) return;
+        const problem = await checkToken(token);
+        if (problem) return showSignIn(problem);
+        storeToken(token); document.getElementById('signin').hidden = true; boot(token);
+      }
+
+      // ------------------------------------------------------------------ the reader ----------
+      function boot(token) {
+        const H = headersFor(token);
+        const apiFetch = (path) => fetch(`${API_BASE}${path.replace(/^\/+/, '')}?ref=${BRANCH}`, { headers: H });
+        // Repo-relative path of an href as written in a page, resolved against the page's folder.
+        const repoPath = (href, routeFile) => {
+          if (/^\//.test(href)) return href.slice(1);
+          const dir = routeFile.includes('/') ? routeFile.replace(/[^/]*$/, '') : '';
+          return new URL(href, `http://x/${dir}`).pathname.slice(1);
+        };
+        const blobCache = new Map();
+        const blobUrl = async (path) => {
+          if (!blobCache.has(path)) {
+            blobCache.set(path, apiFetch(path).then(async r => { if (!r.ok) throw new Error(r.status); return URL.createObjectURL(await r.blob()); }));
           }
-        }).observe(document.body, { childList: true });
+          return blobCache.get(path);
+        };
+
+        // Images and file links must also go through the API with the token: the browser will
+        // not attach our header to an <img src> or a plain link, so fetch them and swap in blob URLs.
+        const privateAssets = (hook, vm) => {
+          // Docsify rewrites relative image paths to basePath (the API). Neutralise those src
+          // attributes before the HTML hits the DOM, so the browser never fires an unauthenticated
+          // request, then fetch each image with the token and swap in a blob URL.
+          hook.afterEach((html, next) => {
+            next(html.replace(/<img\b([^>]*?)\ssrc="([^"]+)"/g, (m, attrs, src) =>
+              src.startsWith(API_BASE) || !/^(https?:|data:|blob:)/.test(src) ? `<img${attrs} data-repo-src="${src}"` : m));
+          });
+          hook.doneEach(() => {
+            const routeFile = (vm.route.file || '').replace(/^\//, '');
+            document.querySelectorAll('.markdown-section img[data-repo-src]').forEach((img) => {
+              const src = img.dataset.repoSrc;
+              const path = src.startsWith(API_BASE) ? decodeURIComponent(src.slice(API_BASE.length).replace(/\?.*$/, '')) : repoPath(src, routeFile);
+              img.dataset.repoPath = path;
+              blobUrl(path).then(u => { img.src = u; }).catch(() => { img.alt = `(image not found: ${path})`; });
+            });
+            // Docsify turns [x](file.pdf) into a route "#/file.pdf"; catch those and plain relative file links.
+            const FILE_EXT = /\.(pdf|png|jpe?g|gif|svg|zip|docx?|xlsx?|pptx?|csv|txt|sbatch|pbs)(\?.*)?$/i;
+            document.querySelectorAll('.markdown-section a[href]').forEach((a) => {
+              const href = a.getAttribute('href') || '';
+              let path;
+              if (/^#\//.test(href) && FILE_EXT.test(href)) path = decodeURIComponent(href.slice(2).replace(/\?.*$/, ''));
+              else if (!/^(#|https?:|mailto:|tel:|blob:)/.test(href) && !/\.md(#|$)/.test(href)) path = repoPath(href, routeFile);
+              else return;
+              a.dataset.repoPath = path; a.removeAttribute('target'); a.href = '#';
+              a.addEventListener('click', async (e) => {
+                e.preventDefault();
+                try { window.open(await blobUrl(path), '_blank'); } catch { alert(`Could not fetch ${path} from GitHub.`); }
+              });
+            });
+          });
+        };
+
+        // Toolbar with edit links; plus make links written as github.com/.../blob/main/... internal.
+        const pageTools = (hook, vm) => {
+          hook.doneEach(() => {
+            const file = (vm.route.file || '').replace(/^\//, '');
+            const article = document.querySelector('.markdown-section');
+            if (!article || !file) return;
+            const edit = sveltiaUrl(file);
+            const bar = document.createElement('div'); bar.className = 'page-tools';
+            bar.innerHTML = [
+              edit ? `<a href="${edit}" title="Open this page in the browser editor">✏️ Edit this page</a>` : '',
+              `<a href="${REPO_URL}/edit/${BRANCH}/${file}" target="_blank" rel="noopener" title="Edit the raw Markdown on GitHub">Edit on GitHub</a>`,
+              `<a href="${REPO_URL}/commits/${BRANCH}/${file}" target="_blank" rel="noopener">History</a>`,
+              `<a id="signout" title="Forget the GitHub login in this browser">Sign out</a>`,
+            ].join('');
+            article.prepend(bar);
+            bar.querySelector('#signout').onclick = signOut;
+            const prefix = `${REPO_URL}/blob/${BRANCH}/`;
+            article.querySelectorAll(`a[href^="${prefix}"]`).forEach((a) => {
+              const rest = a.getAttribute('href').slice(prefix.length);
+              if (/\.md(#.*)?$/.test(rest)) { a.setAttribute('href', '#/' + rest.replace(/\.md(#.*)?$/, '$1')); a.removeAttribute('target'); }
+            });
+          });
+        };
+
+        window.$docsify = {
+          name: 'REPO_NAME documents',
+          repo: REPO_URL,
+          basePath: API_BASE,                 // every page/sidebar/search request goes to the API
+          requestHeaders: H,                  // ...with the reader's credential
+          loadSidebar: true,
+          alias: { '/.*/_sidebar.md': '/_sidebar.md' },
+          subMaxLevel: 2,
+          relativePath: true,
+          auto2top: true,
+          externalLinkTarget: '_blank',
+          notFoundPage: false,
+          search: { paths: 'auto', depth: 3, placeholder: 'Search all pages', noData: 'No matches', maxAge: 3600000 },
+          plugins: [privateAssets, pageTools],
+        };
+        // Plugins first: the page is already loaded, so Docsify initialises the moment its script runs.
+        for (const src of ['../vendor/docsify@5.0.0/plugins/search.min.js', '../vendor/docsify@5.0.0/docsify.min.js']) {
+          const s = document.createElement('script'); s.src = src; s.async = false; document.body.appendChild(s);
+        }
+      }
+
+      // Map a Markdown file to the Sveltia entry that edits it (keep in step with edit/config.yml).
+      // Top-level files -> Sveltia collection entry (see edit/config.yml). Empty = no edit link for them.
+      const FILE_COLLECTIONS = {};
+      const FOLDER_COLLECTIONS = { docs: 'docs' };   // folder name -> collection name in edit/config.yml
+      function sveltiaUrl(file) {
+        if (FILE_COLLECTIONS[file]) return `${EDITOR_BASE}#/collections/${FILE_COLLECTIONS[file]}`;
+        const m = file.match(/^([^/]+)\/(.+)\.md$/);
+        return m && FOLDER_COLLECTIONS[m[1]] ? `${EDITOR_BASE}#/collections/${FOLDER_COLLECTIONS[m[1]]}/entries/${m[2]}` : null;
+      }
+
+      // ------------------------------------------------------------------ start ----------
+      (async () => {
+        const t = savedToken();
+        if (!t) return showSignIn();
+        const problem = await checkToken(t);
+        if (problem) { localStorage.removeItem(OWN_KEY); return showSignIn(problem); }
+        boot(t);
       })();
     </script>
-    <!-- Shared, pinned copy of Sveltia CMS. Do not copy it per folder. -->
-    <script src="../vendor/sveltia-cms@0.226.0/sveltia-cms.js" onerror="__sveltiaScriptFailed()"></script>
   </body>
 </html>
