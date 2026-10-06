@@ -72,13 +72,33 @@
         try { localStorage.removeItem('docsify.search.index'); } catch {}
         location.hash = ''; location.reload();
       }
-      const headersFor = (token) => ({ Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.raw+json', 'X-GitHub-Api-Version': '2022-11-28' });
+      const headersFor = (token) => ({ Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.raw+json' });
+      // Probe the repository itself, not a file in it: a private repo answers 404 to anyone without
+      // access, while a missing file would be a different problem (reported separately below).
       async function checkToken(token) {
-        const r = await fetch(`${API_BASE}README.md?ref=${BRANCH}`, { headers: headersFor(token) });
+        let r;
+        try { r = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' } }); }
+        catch { return 'Could not reach api.github.com (offline, or a network policy blocks it).'; }
         if (r.ok) return null;
         if (r.status === 401) return 'That token is not valid (expired or revoked).';
-        if (r.status === 403 || r.status === 404) return 'Signed in, but this account has no access to the repository.';
+        if (r.status === 403) { const t = await r.text().catch(() => ''); return /rate limit/i.test(t) ? 'GitHub API rate limit reached for this account; try again in a few minutes.' : `Signed in, but GitHub refused access to ${OWNER}/${REPO} (403). For a fine-grained token, check it lists this repository; for an organization repo, an owner may need to approve the token or app.`; }
+        if (r.status === 404) return `Signed in, but this account cannot see ${OWNER}/${REPO}. Check the account is a collaborator and, for a fine-grained token, that the token includes this repository with Contents access.`;
         return `GitHub answered ${r.status}.`;
+      }
+      // The site needs two files on the branch it reads. Say so plainly if they are missing instead
+      // of showing an empty page.
+      async function checkSiteFiles(token) {
+        const missing = [];
+        for (const f of ['README.md', '_sidebar.md']) {
+          const r = await fetch(`${API_BASE}${f}?ref=${BRANCH}`, { method: 'HEAD', headers: headersFor(token) }).catch(() => ({ ok: false, status: 0 }));
+          if (!r.ok) missing.push(f);
+        }
+        if (missing.length) {
+          const n = document.createElement('div'); n.id = 'site-notice';
+          n.style.cssText = 'font:15px/1.5 system-ui,sans-serif;background:#fff4e5;border-bottom:1px solid #f0c36d;padding:0.75rem 1rem;color:#5a3b00';
+          n.innerHTML = `Branch <code>${BRANCH}</code> of <code>${OWNER}/${REPO}</code> has no ${missing.map(f => `<code>${f}</code>`).join(' or ')} yet, so there is no home page or navigation. Merge the branch that adds the site files, or open a page by URL (for example <code>#/new_team_member</code>).`;
+          document.body.prepend(n);
+        }
       }
       // Same popup protocol Sveltia/Decap use with sveltia-cms-auth, so one relay serves both.
       function oauthSignIn() {
@@ -111,7 +131,7 @@
         if (!token) return;
         const problem = await checkToken(token);
         if (problem) return showSignIn(problem);
-        storeToken(token); document.getElementById('signin').hidden = true; boot(token);
+        storeToken(token); document.getElementById('signin').hidden = true; await checkSiteFiles(token); boot(token);
       }
 
       // ------------------------------------------------------------------ the reader ----------
@@ -228,7 +248,7 @@
         if (!t) return showSignIn();
         const problem = await checkToken(t);
         if (problem) { localStorage.removeItem(OWN_KEY); return showSignIn(problem); }
-        boot(t);
+        await checkSiteFiles(t); boot(t);
       })();
     </script>
   </body>
