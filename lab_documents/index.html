@@ -33,9 +33,11 @@
       <div id="token-form" hidden>
         <input id="token-input" type="password" placeholder="github_pat_… (Contents: read is enough to read)" autocomplete="off" />
         <button id="btn-token-go">Continue</button>
-        <p class="muted">Create one at github.com → Settings → Developer settings → Fine-grained tokens,
-          scoped to the <code>lab_documents</code> repository. Add Pull requests and Issues permissions if you
-          also want to edit.</p>
+        <p class="muted"><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create
+          a fine-grained token</a> (github.com → Settings → Developer settings → Fine-grained tokens): under
+          Repository access choose "Only select repositories" and pick <code>lab_documents</code>; under
+          Repository permissions set Contents to Read-only. To edit as well, set Contents and Pull requests
+          to Read and write, and Issues to Read-only. Copy the <code>github_pat_…</code> value here.</p>
       </div>
       <p class="err" id="signin-error" hidden></p>
     </div>
