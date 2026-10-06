@@ -39,10 +39,10 @@ publish_mode: simple
 media_folder: computing/assets
 public_folder: /computing/assets
 
-# The top-bar "view site" link: the rendered docs (internal address, reachable on campus/VPN).
+# The top-bar "view site" link: the reader next to this editor.
 # The review queue on GitHub is: https://github.com/uasal/lab_documents/pulls?q=is%3Apr+is%3Aopen+label%3Asveltia-cms%2Fpending_review
-site_url: http://10.130.30.8/stp_org_struct/lab_documents/
-display_url: http://10.130.30.8/stp_org_struct/lab_documents/
+site_url: https://www.ewandouglas.space/docs_editor/lab_documents/
+display_url: https://www.ewandouglas.space/docs_editor/lab_documents/
 
 # All pages use one field: the whole Markdown file is the body. `format: raw`
 # makes Sveltia write the body back verbatim, with no YAML front matter, so the
