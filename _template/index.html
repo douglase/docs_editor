@@ -205,12 +205,6 @@
             ].join('');
             article.prepend(bar);
             bar.querySelector('#signout').onclick = signOut;
-            if (!article.querySelector('.site-credit')) {
-              const c = document.createElement('p'); c.className = 'site-credit';
-              c.style.cssText = 'font-size:12px;color:#888;margin-top:3rem';
-              c.innerHTML = 'Site built with <a href="https://claude.com/claude-code" style="color:inherit">Claude Code</a> and reviewed by the lab.';
-              article.append(c);
-            }
             const prefix = `${REPO_URL}/blob/${BRANCH}/`;
             article.querySelectorAll(`a[href^="${prefix}"]`).forEach((a) => {
               const rest = a.getAttribute('href').slice(prefix.length);
