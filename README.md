@@ -25,14 +25,16 @@ self-hosted copy needs. The repository stays the system of record.
 | Folder | Repository |
 |---|---|
 | `lab_documents/` | `uasal/lab_documents` (lab policies, onboarding, safety, computing) |
+| `esc-alignment/` | `douglase/esc-alignment` (the ESC alignment plan; `README.md` and `docs/`) |
 
 ## Adding a repository
 
 1. Copy `_template/` to `<repo_name>/`.
 2. Reader, `<repo_name>/index.html`: set `OWNER`, `REPO`, `BRANCH`, the page title, and the
    `FILE_COLLECTIONS` / `FOLDER_COLLECTIONS` maps that turn a file path into its editor entry.
-   The target repo needs a `_sidebar.md` at its root (Docsify navigation; search indexes what it
-   lists) and a `README.md` as the home page.
+   `README.md` in the target repo is the home page. If the repo has a `_sidebar.md`, that is the
+   navigation; if not, the reader lists every Markdown file in the repo, grouped by folder, and
+   searches all of them.
 3. Editor, `<repo_name>/edit/config.yml`: set `backend.repo`, `branch`, and describe the editable
    folders or files as collections. The template shows plain-Markdown (`format: raw`),
    front-matter, and review-required (`editorial_workflow`) examples. The schema in the

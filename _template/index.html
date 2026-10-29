@@ -89,16 +89,34 @@
       }
       // The site needs two files on the branch it reads. Say so plainly if they are missing instead
       // of showing an empty page.
+      // A repo with a _sidebar.md gets that navigation. Without one, the reader lists every Markdown
+      // file in the repo tree, grouped by folder, and searches all of them. README.md is the home page.
+      let generatedSidebar = null;   // { html, paths } when built from the tree
       async function checkSiteFiles(token) {
-        const missing = [];
-        for (const f of ['README.md', '_sidebar.md']) {
-          const r = await fetch(`${API_BASE}${f}?ref=${BRANCH}`, { method: 'HEAD', headers: headersFor(token) }).catch(() => ({ ok: false, status: 0 }));
-          if (!r.ok) missing.push(f);
+        const H = headersFor(token);
+        const head = async (f) => (await fetch(`${API_BASE}${f}?ref=${BRANCH}`, { method: 'HEAD', headers: H }).catch(() => ({ ok: false }))).ok;
+        const hasReadme = await head('README.md'), hasSidebar = await head('_sidebar.md');
+        if (!hasSidebar) {
+          try {
+            const r = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' } });
+            const tree = (await r.json()).tree || [];
+            const md = tree.filter(e => e.type === 'blob' && /\.md$/i.test(e.path) && !/^(_|\.)/.test(e.path.split('/').pop()) && !/(^|\/)(node_modules|vendor)\//.test(e.path)).map(e => e.path);
+            const groups = {};
+            for (const f of md) { const dir = f.includes('/') ? f.replace(/\/[^/]*$/, '') : ''; (groups[dir] = groups[dir] || []).push(f); }
+            const label = (f) => f.split('/').pop().replace(/\.md$/i, '').replace(/[_-]+/g, ' ');
+            const item = (f) => `<li><a href="#/${f.replace(/\.md$/i, '')}">${f === 'README.md' ? 'Home' : label(f)}</a></li>`;
+            let html = '';
+            for (const dir of Object.keys(groups).sort((a, b) => (a === '' ? -1 : b === '' ? 1 : a.localeCompare(b)))) {
+              const files = groups[dir].sort((a, b) => (a === 'README.md' ? -1 : b === 'README.md' ? 1 : a.localeCompare(b)));
+              html += dir ? `<li><p><strong>${dir}</strong></p><ul>${files.map(item).join('')}</ul></li>` : files.map(item).join('');
+            }
+            generatedSidebar = { html: `<ul>${html}</ul>`, paths: md.map(f => '/' + f.replace(/\.md$/i, '')) };
+          } catch {}
         }
-        if (missing.length) {
+        if (!hasReadme || (!hasSidebar && !generatedSidebar)) {
           const n = document.createElement('div'); n.id = 'site-notice';
           n.style.cssText = 'font:15px/1.5 system-ui,sans-serif;background:#fff4e5;border-bottom:1px solid #f0c36d;padding:0.75rem 1rem;color:#5a3b00';
-          n.innerHTML = `Branch <code>${BRANCH}</code> of <code>${OWNER}/${REPO}</code> has no ${missing.map(f => `<code>${f}</code>`).join(' or ')} yet, so there is no home page or navigation. Merge the branch that adds the site files, or open a page by URL (for example <code>#/new_team_member</code>).`;
+          n.innerHTML = `Branch <code>${BRANCH}</code> of <code>${OWNER}/${REPO}</code> has no <code>README.md</code>${!hasSidebar && !generatedSidebar ? ' and the navigation could not be built' : ''}, so there may be no home page. Open a page by URL (for example <code>#/docs/PLAN</code>) or add a README.`;
           document.body.prepend(n);
         }
       }
@@ -146,10 +164,18 @@
           const dir = routeFile.includes('/') ? routeFile.replace(/[^/]*$/, '') : '';
           return new URL(href, `http://x/${dir}`).pathname.slice(1);
         };
+        // GitHub labels every raw file "application/vnd.github.raw+json"; browsers need the real type
+        // for SVG images and for opening PDFs inline, so set it from the extension.
+        const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp',
+                       pdf: 'application/pdf', txt: 'text/plain', csv: 'text/csv', json: 'application/json', md: 'text/markdown', html: 'text/html' };
         const blobCache = new Map();
         const blobUrl = async (path) => {
           if (!blobCache.has(path)) {
-            blobCache.set(path, apiFetch(path).then(async r => { if (!r.ok) throw new Error(r.status); return URL.createObjectURL(await r.blob()); }));
+            blobCache.set(path, apiFetch(path).then(async r => {
+              if (!r.ok) throw new Error(r.status);
+              const type = MIME[(path.split('.').pop() || '').toLowerCase()] || 'application/octet-stream';
+              return URL.createObjectURL(new Blob([await r.arrayBuffer()], { type }));
+            }));
           }
           return blobCache.get(path);
         };
@@ -213,20 +239,28 @@
           });
         };
 
+        // Navigation built from the repo tree when the repo has no _sidebar.md.
+        const treeSidebar = (hook) => {
+          if (!generatedSidebar) return;
+          // Docsify re-renders the sidebar on every route when loadSidebar is off, so re-apply each time.
+          const fill = () => { const nav = document.querySelector('.sidebar-nav'); if (nav && nav.innerHTML !== generatedSidebar.html) nav.innerHTML = generatedSidebar.html; };
+          hook.mounted(fill); hook.doneEach(fill);
+        };
+
         window.$docsify = {
           name: 'REPO_NAME documents',
           repo: REPO_URL,
           basePath: API_BASE,                 // every page/sidebar/search request goes to the API
           requestHeaders: H,                  // ...with the reader's credential
-          loadSidebar: true,
+          loadSidebar: !generatedSidebar,
           alias: { '/.*/_sidebar.md': '/_sidebar.md' },
           subMaxLevel: 2,
           relativePath: true,
           auto2top: true,
           externalLinkTarget: '_blank',
           notFoundPage: false,
-          search: { paths: 'auto', depth: 3, placeholder: 'Search all pages', noData: 'No matches', maxAge: 3600000 },
-          plugins: [privateAssets, pageTools],
+          search: { paths: generatedSidebar ? generatedSidebar.paths : 'auto', depth: 3, placeholder: 'Search all pages', noData: 'No matches', maxAge: 3600000 },
+          plugins: [privateAssets, pageTools, treeSidebar],
         };
         // Plugins first: the page is already loaded, so Docsify initialises the moment its script runs.
         for (const src of ['../vendor/docsify@5.0.0/plugins/search.min.js', '../vendor/docsify@5.0.0/docsify.min.js']) {

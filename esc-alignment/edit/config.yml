@@ -1,0 +1,53 @@
+# Built with Claude Code (https://claude.com/claude-code) and reviewed by the lab.
+# Sveltia CMS configuration for the esc-alignment repository: the README and the docs/ folder.
+# Files are written back verbatim (format: raw), no front matter. The Python tool, inputs/ and
+# tests/ are not exposed here; edit those through git.
+
+backend:
+  name: github
+  repo: douglase/esc-alignment
+  branch: main
+  # base_url: https://sveltia-cms-auth.<your-account>.workers.dev
+  auth_methods: [oauth, token]
+  squash_merges: true
+  cms_label_prefix: sveltia-cms/
+
+publish_mode: simple
+
+media_folder: docs
+public_folder: /docs
+
+site_url: https://www.ewandouglas.space/docs_editor/esc-alignment/
+display_url: https://www.ewandouglas.space/docs_editor/esc-alignment/
+
+collections:
+  - name: readme
+    label: README
+    icon: home
+    format: raw
+    editor: { preview: true }
+    files:
+      - name: readme
+        label: README
+        file: README.md
+        fields: &body_only
+          - name: body
+            label: Page content
+            widget: markdown
+            modes: [rich_text, raw]
+
+  - name: docs
+    label: Docs
+    icon: description
+    description: The alignment plan and its figures. Saves commit directly to main.
+    folder: docs
+    format: raw
+    extension: md
+    create: true
+    delete: false
+    summary: "{{body | truncate(60)}}"
+    slug: { template: new-page, editable: true, hint: "File name, e.g. PLAN" }
+    media_folder: /docs
+    public_folder: /docs
+    editor: { preview: true }
+    fields: *body_only
